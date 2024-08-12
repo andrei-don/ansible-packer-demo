@@ -1,0 +1,18 @@
+---
+- name: Setup prerequisites
+  hosts: all
+  vars:
+    auxiliary_packages:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gpg
+  roles:
+    - role: kernel_setup
+    - role: cri_setup
+    - role: kube_components_setup
+
+- name: Setup Kubernetes Control Plane
+  hosts: all
+  roles:
+    - role: single_control_plane_setup

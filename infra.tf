@@ -158,7 +158,7 @@ resource "aws_instance" "this" {
   iam_instance_profile   = aws_iam_instance_profile.profile.name
   subnet_id              = aws_subnet.this.id
   vpc_security_group_ids = [aws_security_group.this.id]
-  user_data = file("${path.module}/user_data.sh")
+  user_data              = file("${path.module}/user_data.sh")
   tags = {
     Name = "test-instance"
   }
@@ -175,7 +175,7 @@ resource "aws_vpc_security_group_ingress_rule" "this" {
   security_group_id = aws_security_group.this.id
 
   referenced_security_group_id = aws_security_group.this.id
-  ip_protocol = -1
+  ip_protocol                  = -1
 }
 
 
