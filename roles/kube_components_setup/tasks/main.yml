@@ -1,0 +1,46 @@
+---
+# tasks file for kube_components_setup
+- name: Check if Kubernetes GPG key already exists
+  ansible.builtin.stat:
+    path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  register: kubernetes_gpg_key
+
+- name: Installing necessary apt-packages
+  apt:
+    name: "{{ item }}"
+    update_cache: yes
+  with_items: "{{ auxiliary_packages }}"
+
+- name: Download Kubernetes GPG keys
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key"
+    dest: /tmp/kubernetes-release-key.asc
+
+- name: Convert and move the Kubernetes GPG key to the keyrings directory
+  command:
+    cmd: gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-release-key.asc
+  when: not kubernetes_gpg_key.stat.exists
+
+- name: Add Kubernetes apt repository
+  apt_repository:
+    repo: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /'
+    filename: kubernetes
+
+- name: Install kubelet, kubectl, kubeadm and runc
+  apt:
+    name: "{{ item }}"
+    update_cache: yes
+  with_items:
+    - "kubelet={{ kube_patch_version }}-1.1"
+    - "kubectl={{ kube_patch_version }}-1.1"
+    - "kubeadm={{ kube_patch_version }}-1.1"
+    - "runc"
+
+- name: Hold kubelet, kubeadm and kubectl apt-packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  with_items:
+    - kubelet
+    - kubeadm
+    - kubectl

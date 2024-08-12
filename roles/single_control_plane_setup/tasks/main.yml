@@ -1,0 +1,12 @@
+---
+# tasks file for single_control_plane_setup
+
+- name: Create config folder for calico
+  ansible.builtin.file:
+    path: /root/calico
+    state: directory
+    
+- name: Generate calico manifest from template
+  ansible.builtin.template:
+    src: calico.j2
+    dest: /root/calico/calico.yaml

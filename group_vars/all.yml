@@ -1,0 +1,5 @@
+containerd_version: "1.7.18"
+crictl_version: "1.30.0"
+kube_patch_version: "1.30.2"
+kube_minor_version: "1.30"
+pod_subnet: "10.244.0.0/16"

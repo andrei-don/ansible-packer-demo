@@ -1,0 +1,90 @@
+---
+# tasks file for cri_setup
+- name: Check if containerd binary exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/containerd
+  register: containerd_stat
+
+- name: Check if crictl binary exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/crictl
+  register: crictl_stat
+
+- name: Download containerd
+  ansible.builtin.get_url: 
+      url: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+      dest: "/tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+      force: false
+  when: not containerd_stat["stat"]["exists"]
+
+- name: Extract containerd tarball to /usr/local
+  unarchive:
+    src: "/tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+    dest: "/usr/local"
+    remote_src: true
+  when: not containerd_stat["stat"]["exists"]
+
+- name: Cleanup containerd tarball
+  file:
+    path: "/tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+    state: absent
+
+- name: Create systemd directory for containerd
+  file:
+    path: "/usr/local/lib/systemd/system/"
+    state: directory
+
+- name: Download containerd.service file
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/containerd/containerd/main/containerd.service"
+    dest: "/usr/local/lib/systemd/system/containerd.service"
+
+- name: Create containerd configuration directory
+  file:
+    path: "/etc/containerd"
+    state: directory
+
+- name: Generate containerd configuration
+  command: 
+    cmd: "containerd config default"
+  register: containerd_default_config
+
+- name: Write containerd config to file
+  copy:
+    content: "{{ containerd_default_config.stdout }}"
+    dest: "/etc/containerd/config.toml"
+
+- name: Set the cgroup driver to systemd
+  shell: sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+    
+- name: Download crictl
+  ansible.builtin.get_url:
+      url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
+      dest: "/tmp/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
+      force: false
+  when: not crictl_stat["stat"]["exists"]
+
+- name: Extract crictl tarball to /usr/local
+  unarchive:
+    src: "/tmp/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
+    dest: "/usr/local/bin"
+    remote_src: yes
+  when: not crictl_stat["stat"]["exists"]
+
+- name: Configure crictl to work with containerd
+  ansible.builtin.command:
+    cmd: "crictl config runtime-endpoint unix:///var/run/containerd/containerd.sock"
+
+- name: Ensure systemd picked up latest containerd unit file
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Ensure containerd is enabled and started
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: yes
+    state: started
+  register: containerd_start
+  retries: 3
+  delay: 10
+  until: containerd_start is succeeded
